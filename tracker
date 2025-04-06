@@ -187,12 +187,12 @@ def valid_id(n): #Helper function to check if the month is valid
 
 def main():
     #Parser object 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Track your expenses from the command line!")
     #subparser to deal with commands
     subparser = parser.add_subparsers(dest="command")
 
     #parser to deal with the add command and its arguments
-    add_parser = subparser.add_parser("add")
+    add_parser = subparser.add_parser("add", help="Add your latest expense!")
     add_parser.add_argument("--description", "-d", required=True, type=str)
     add_parser.add_argument("--amount","-a", required=True, type=positive_type)
 
@@ -200,15 +200,15 @@ def main():
     subparser.add_parser("list")
 
     #parser to deal with the summary command
-    summary_parser = subparser.add_parser("summary")
+    summary_parser = subparser.add_parser("summary", help="Gives you the total spent!")
     summary_parser.add_argument("--month", "-m", required=False, type=valid_month)
 
     #parser to deal with delete
-    delete_parser = subparser.add_parser("delete")
+    delete_parser = subparser.add_parser("delete", help="Deletes any given expense!")
     delete_parser.add_argument("--id", "-id", required=True, type=valid_id)
 
     #parser to deal with export
-    subparser.add_parser("export")
+    subparser.add_parser("export", help="Exports your expenses onto a csv file!")
 
     args = parser.parse_args()
     if args.command == "add":
