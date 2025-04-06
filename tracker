@@ -1,0 +1,224 @@
+#!/usr/bin/env python
+
+import time, os, argparse
+import json, csv
+from prettytable import PrettyTable
+
+def add(args):
+    #gets the already existing data if the file exists
+    #creates it if it doesn't
+    if os.path.exists("expenses.json"):
+        with open("expenses.json", "r") as file:
+            try:
+                expenses = json.load(file)
+            except json.JSONDecodeError:
+                expenses = []
+    else:
+        expenses = []
+    
+    #to get a valid id
+    if expenses:
+        max_id = max(expense["id"] for expense in expenses)
+    else:
+        max_id = 0
+
+    #the expense/data itself
+    expense = {
+        "id": int(max_id+1),
+        "description": args.description,
+        "date": time.strftime("%Y-%m-%d", time.localtime()),
+        "amount": args.amount
+        }
+    
+    expenses.append(expense)
+
+    #writes the data onto the file
+    with open("expenses.json", "w") as file:
+        json.dump(expenses, file, indent=4)
+        print(f"Successfully added {args.description}")
+
+def list():
+    if not os.path.exists("expenses.json"):
+        print("No expenses to show!")
+        return
+    
+    with open("expenses.json", "r") as file:
+        try:
+            expenses = json.load(file)
+            if not expenses:
+                print("No expenses to show!")
+                return
+            
+            #Creating a table for aesthetics
+            table = PrettyTable()
+            
+            #Naming the first row
+            table.field_names = ["Id", "Date", "Description", "Amount"]
+            for expense in expenses:
+                #Filling the table
+                table.add_row([expense["id"], expense["date"], expense["description"], f"{expense["amount"]}$"], divider=True)
+            
+            #Creating a custom border
+            table.vertical_char = "|"
+            table.horizontal_char = "_"
+            table.junction_char = " "
+                         
+            print(table)
+
+        except json.JSONDecodeError:
+            print("No expenses to show!")
+
+def summary(args):
+    if not os.path.exists("expenses.json"):
+        print("No expenses to summarise!")
+        return
+    
+    with open("expenses.json", "r") as file:
+        try:
+            expenses = json.load(file)
+            if not expenses:
+                raise Exception("No expenses to summarise!")
+            
+            total = 0
+            found = False
+            months = ["January","February","March","April","May","June","July","August","September",
+                      "October","November","December"]
+
+            #Loop over all the expenses
+            for expense in expenses:
+                if args.month:  #if given an argument
+                    #slice the expense's month from the date
+                    month = expense["date"][5:7]
+                    #Compare it with the given argument
+                    if int(month) == args.month:
+                        total+=expense["amount"]
+                        found = True
+                else:
+                    total+=expense["amount"]
+                    found = True
+            
+            if not found or total == 0:
+                print(f"No expense this month.")
+                return
+
+            print(f"Total expenses for {months[args.month-1]}: {total}$" if args.month else f"Total expenses: {total}$") 
+            
+
+        except json.JSONDecodeError:
+            print("No expenses to summarise!")
+
+def delete(args):
+    if not os.path.exists("expenses.json"):
+        raise Exception("No expense to delete!")
+    
+    with open("expenses.json", "r") as file:
+        try:
+            expenses = json.load(file)
+        except json.JSONDecodeError:
+            print("No expense to delete!")
+        
+        if not expenses:
+            raise Exception("No expense to delete!")
+        
+        deleted = False
+        
+        for id, expense in enumerate(expenses):
+            #Compare each expense's id with the given one
+            if expense["id"] == args.id:
+                #Delete if they are the same
+                del expenses[id]
+                deleted = True
+                break
+        
+        if not deleted:
+            print(f"No expense with Id: {args.id}")
+            return
+
+    with open("expenses.json", "w") as file:
+        json.dump(expenses, file, indent=4)
+        print("Successfully deleted expense")
+        
+def export():
+    if not os.path.exists("expenses.json"):
+        raise FileNotFoundError("File doesn't exist!")
+    
+    #Get the data from the json file
+    with open("expenses.json", "r") as file:
+        try:
+            data = json.load(file)
+        except json.JSONDecodeError:
+            print("No data to export!")
+    #Write it on the csv file
+    with open("user_expenses.csv", "w") as file:
+        try:
+            writer = csv.DictWriter(file, fieldnames=data[0].keys(), delimiter='|')
+
+            writer.writeheader()
+            writer.writerows(data)
+        except csv.Error:
+            print("No data to export!")
+
+def positive_type(n): #Helper function to check if amount is valid
+    try:
+        f = float(n)
+        if f <= 0:
+            raise argparse.ArgumentTypeError(f"{n} is not a positive number!")
+        return f
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{n} is not a number!")
+
+def valid_month(n): #Helper function to check if the month is valid
+    try:
+        n = int(n)
+        if n >12 or n <= 0 :
+            raise argparse.ArgumentTypeError(f"{n} is not a valid month!")
+        return n
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{n} is not a valid month!")
+
+def valid_id(n): #Helper function to check if the month is valid
+    try:
+        n = int(n)
+        if n <= 0 :
+            raise argparse.ArgumentTypeError(f"{n} is not a valid id!")
+        return n
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{n} is not a valid id!")
+
+def main():
+    #Parser object 
+    parser = argparse.ArgumentParser()
+    #subparser to deal with commands
+    subparser = parser.add_subparsers(dest="command")
+
+    #parser to deal with the add command and its arguments
+    add_parser = subparser.add_parser("add")
+    add_parser.add_argument("--description", "-d", required=True, type=str)
+    add_parser.add_argument("--amount","-a", required=True, type=positive_type)
+
+    #parser to deal with the list command
+    subparser.add_parser("list")
+
+    #parser to deal with the summary command
+    summary_parser = subparser.add_parser("summary")
+    summary_parser.add_argument("--month", "-m", required=False, type=valid_month)
+
+    #parser to deal with delete
+    delete_parser = subparser.add_parser("delete")
+    delete_parser.add_argument("--id", "-id", required=True, type=valid_id)
+
+    #parser to deal with export
+    subparser.add_parser("export")
+
+    args = parser.parse_args()
+    if args.command == "add":
+        add(args)
+    if args.command == "list":
+        list()
+    if args.command == "summary":
+        summary(args)
+    if args.command == "delete":
+        delete(args)
+    if args.command == "export":
+        export()
+main()
